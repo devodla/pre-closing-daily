@@ -13,8 +13,18 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-v"
+addopts = "--cov=src -v"
 pythonpath = "."
 testpaths = [
-    "tests"
+    "tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover"
 ]

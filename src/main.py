@@ -1,9 +1,9 @@
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict
+from datetime import datetime, timedelta, date
+from typing import List, Optional, Dict, Set
 
 def calculate_reports(
-    closing_days: int,
-    daily_days: int,
+    closing_business_day: int,
+    daily_offset: int,
     reference_date: Optional[str] = None,
     holidays: Optional[List[str]] = None
 ) -> List[Dict[str, str]]:
@@ -13,86 +13,87 @@ def calculate_reports(
     reference = _parse_reference_date(reference_date)
     holidays_set = _prepare_holidays(holidays)
 
-    results = []
+    reports = []
 
     if _is_business_day(reference, holidays_set):
-        if _is_first_business_day_of_month(reference, holidays_set):
-            results.append(_create_report(reference, _last_business_day_of_previous_month(reference, holidays_set), "pre_closing"))
-        elif _is_closing_day(reference, closing_days, holidays_set):
-            results.append(_create_report(reference, _last_business_day_of_previous_month(reference, holidays_set), "closing"))
+        if _is_first_business_day(reference, holidays_set):
+            reports.append(_create_report(reference, _last_business_day_of_previous_month(reference, holidays_set), "pre_closing"))
+        if _is_nth_business_day(reference, closing_business_day, holidays_set):
+            reports.append(_create_report(reference, _last_business_day_of_previous_month(reference, holidays_set), "closing"))
 
-    # Always generate daily report
-    daily_base_date = _subtract_days(reference, daily_days)
-    results.append(_create_report(reference, daily_base_date, "daily"))
+    base_for_daily = _subtract_days(reference, daily_offset)
+    reports.append(_create_report(reference, base_for_daily, "daily"))
 
-    return results
+    return reports
 
 # --- Helper functions ---
 
-def _parse_reference_date(reference_date: Optional[str]) -> datetime.date:
-    return datetime.strptime(reference_date, "%Y-%m-%d").date() if reference_date else datetime.now().date()
+def _parse_reference_date(reference_date: Optional[str]) -> date:
+    return datetime.strptime(reference_date, "%Y-%m-%d").date() if reference_date else date.today()
 
-def _prepare_holidays(holidays: Optional[List[str]]) -> set:
-    if not holidays:
-        return set()
-    return {datetime.strptime(date_str, "%Y-%m-%d").date() for date_str in holidays}
+def _prepare_holidays(holidays: Optional[List[str]]) -> Set[date]:
+    return {datetime.strptime(d, "%Y-%m-%d").date() for d in holidays} if holidays else set()
 
-def _is_business_day(date: datetime.date, holidays: set) -> bool:
-    return date.weekday() < 5 and date not in holidays
+def _is_business_day(d: date, holidays: Set[date]) -> bool:
+    return d.weekday() < 5 and d not in holidays
 
-def _first_business_day_of_month(date: datetime.date, holidays: set) -> datetime.date:
-    first_day = date.replace(day=1)
-    while not _is_business_day(first_day, holidays):
-        first_day += timedelta(days=1)
-    return first_day
+def _first_business_day_of_month(d: date, holidays: Set[date]) -> date:
+    first = d.replace(day=1)
+    while not _is_business_day(first, holidays):
+        first += timedelta(days=1)
+    return first
 
-def _is_first_business_day_of_month(date: datetime.date, holidays: set) -> bool:
-    return date == _first_business_day_of_month(date, holidays)
+def _is_first_business_day(d: date, holidays: Set[date]) -> bool:
+    return d == _first_business_day_of_month(d, holidays)
 
-def _last_business_day_of_previous_month(date: datetime.date, holidays: set) -> datetime.date:
-    first_day_of_month = date.replace(day=1)
-    last_day_previous_month = first_day_of_month - timedelta(days=1)
-    while not _is_business_day(last_day_previous_month, holidays):
-        last_day_previous_month -= timedelta(days=1)
-    return last_day_previous_month
+def _last_business_day_of_previous_month(d: date, holidays: Set[date]) -> date:
+    last = d.replace(day=1) - timedelta(days=1)
+    while not _is_business_day(last, holidays):
+        last -= timedelta(days=1)
+    return last
 
-def _subtract_days(date: datetime.date, days: int) -> datetime.date:
-    """
-    Subtract calendar days (not business days).
-    """
-    return date - timedelta(days=days)
-
-def _is_closing_day(reference: datetime.date, closing_days: int, holidays: set) -> bool:
-    """
-    Check if the reference date is the N-th business day of the current month.
-    """
-    first_business_day = _first_business_day_of_month(reference, holidays)
-
-    business_day_count = 0
-    current_date = first_business_day
-
-    while current_date <= reference:
-        if _is_business_day(current_date, holidays):
-            business_day_count += 1
-        if current_date == reference:
+def _is_nth_business_day(d: date, n: int, holidays: Set[date]) -> bool:
+    current = _first_business_day_of_month(d, holidays)
+    count = 0
+    while current <= d:
+        if _is_business_day(current, holidays):
+            count += 1
+        if current == d:
             break
-        current_date += timedelta(days=1)
+        current += timedelta(days=1)
+    return count == n
 
-    return business_day_count == closing_days
+def _subtract_days(d: date, offset: int) -> date:
+    return d - timedelta(days=offset)
 
-def _create_report(reference_date: datetime.date, base_date: datetime.date, report_type: str) -> Dict[str, str]:
+def _create_report(reference: date, base: date, report_type: str) -> Dict[str, str]:
     return {
-        "reference_date": reference_date.strftime("%Y-%m-%d"),
-        "base_date": base_date.strftime("%Y-%m-%d"),
+        "reference_date": reference.strftime("%Y-%m-%d"),
+        "base_date": base.strftime("%Y-%m-%d"),
         "report_type": report_type
     }
 
-def main():
+def main():  # pragma: no cover
     print("Hello from utils-days!")
-    holidays = ["2025-05-01", "2025-06-19"]
-    closing_days = 2
+    holidays = ["2025-03-03", "2025-03-04", "2025-04-18", "2025-04-21", "2025-05-01", "2025-06-19"]
+    closing_days = 3
     daily_days = 1
 
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-02-28", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-03-01", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-03-02", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-03-03", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-03-04", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-03-05", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-03-06", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-03-07", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-04-17", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-04-18", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-04-19", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-04-20", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-04-21", holidays=holidays))
+    print(calculate_reports(closing_days, daily_days, reference_date="2025-04-22", holidays=holidays))
+    
     print(calculate_reports(closing_days, daily_days, reference_date="2025-04-30", holidays=holidays))
     print(calculate_reports(closing_days, daily_days, reference_date="2025-05-01", holidays=holidays))
     print(calculate_reports(closing_days, daily_days, reference_date="2025-05-02", holidays=holidays))
@@ -110,5 +111,5 @@ def main():
     print(calculate_reports(closing_days, daily_days, reference_date="2025-06-04", holidays=holidays))
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     main()
