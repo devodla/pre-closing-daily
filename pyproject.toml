@@ -28,3 +28,16 @@ show_missing = true
 exclude_lines = [
     "pragma: no cover"
 ]
+
+[tool.ruff]
+line-length = 88
+show-fixes = true
+select = [
+    "F",
+    "W",
+    "E",
+    "I",
+    "UP",
+    "PL"
+]
+ignore = ["PLR2004"]
