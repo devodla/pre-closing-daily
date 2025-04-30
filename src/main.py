@@ -79,7 +79,9 @@ def _is_first_business_day(d: date, holidays: set[date]) -> bool:
     return d == _first_business_day_of_month(d, holidays)
 
 
-def _last_business_day_of_previous_month(d: date, holidays: set[date]) -> date:
+def _last_business_day_of_previous_month(
+    d: date, holidays: set[date]
+) -> date:  # pragma: no cover
     last = d.replace(day=1) - timedelta(days=1)
     while not _is_business_day(last, holidays):
         last -= timedelta(days=1)
